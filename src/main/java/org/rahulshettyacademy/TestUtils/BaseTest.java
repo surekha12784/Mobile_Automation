@@ -7,7 +7,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.time.Duration;
@@ -37,10 +36,17 @@ public class BaseTest {
 
         String ipAddress = prop.getProperty("ipAddress");
         String port = prop.getProperty("port");
+        String deviceName = System.getenv("ANDROID_DEVICE_NAME");
+
+        if (deviceName == null || deviceName.isEmpty()) {
+            deviceName = prop.getProperty("AndroidDeviceName");
+        }
+
+
 
         UiAutomator2Options options = new UiAutomator2Options();
 
-        options.setDeviceName("MobileTestSurekha");
+        options.setDeviceName(deviceName);
 
         options.setApp(
                 System.getProperty("user.dir")

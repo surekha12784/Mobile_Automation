@@ -3,6 +3,7 @@ name: Mobile Automation CI
 on:
   push:
     branches: [ main ]
+
   pull_request:
     branches: [ main ]
 
@@ -12,9 +13,11 @@ jobs:
 
     steps:
 
+      # Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -22,77 +25,134 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # Node
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install Appium
-        run: |
-          npm install -g appium
-          appium driver install uiautomator2
-          appium --version
-          appium driver list --installed
-
+      # Android SDK
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Android emulator
+      # Android packages
+      - name: Install Android SDK packages
         run: |
-          sdkmanager "platform-tools" "emulator" \
-            "platforms;android-35" \
-            "system-images;android-35;google_apis;x86_64"
-          
+          sdkmanager "platform-tools"
+          sdkmanager "emulator"
+          sdkmanager "platforms;android-35"
+          sdkmanager "system-images;android-35;google_apis;x86_64"
+
+      # Appium
+      - name: Install Appium
+        run: |
+          npm install -g appium@latest
+          appium --version
+
+      # UiAutomator2
+      - name: Install UiAutomator2
+        run: |
+          appium driver install uiautomator2
+          appium driver list --installed
+
+      # Create emulator
+      - name: Create Android Emulator
+        run: |
           echo "no" | avdmanager create avd \
-            -n test-emulator \
-            -k "system-images;android-35;google_apis;x86_64" \
+            --name test-emulator \
+            --package "system-images;android-35;google_apis;x86_64" \
+            --device "pixel_2" \
             --force
-          
+
           emulator -list-avds
 
-      - name: Start Android emulator
-        timeout-minutes: 5
+      # Start emulator
+      - name: Start Android Emulator
+        timeout-minutes: 10
         run: |
+
           echo "Starting emulator..."
-          
+
           nohup emulator \
-          -avd test-emulator \
-          -no-window \
-          -no-audio \
-          -no-boot-anim \
-          -no-snapshot \
-          -gpu swiftshader_indirect \
-          > emulator.log 2>&1 &
-          
-          echo "Waiting for device..."
-          
+            -avd test-emulator \
+            -no-window \
+            -no-audio \
+            -no-boot-anim \
+            -no-snapshot \
+            -gpu swiftshader_indirect \
+            -no-metrics \
+            > emulator.log 2>&1 &
+
+          echo "Waiting for emulator..."
+
           adb wait-for-device
-          
+
           echo "ADB detected device"
-          
-          for i in {1..60}; do
-          BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
-          echo "Boot status: $BOOT_COMPLETED"
+          for i in {1..120}; do
 
-          if [ "$BOOT_COMPLETED" = "1" ]; then
-           echo "Android emulator is ready!"
-           break
-          fi
+            BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
-          sleep 5
+            echo "Boot status: $BOOT_COMPLETED"
+
+            if [ "$BOOT_COMPLETED" = "1" ]; then
+              echo "Android emulator is ready!"
+              break
+            fi
+
+            sleep 5
+
           done
-          
-          adb devices
-          
-          echo "===== Emulator Log ====="
-          cat emulator.log
 
-      - name: Start Appium server
+          echo "Connected devices:"
+          adb devices
+
+          echo "Boot completed:"
+          adb shell getprop sys.boot_completed
+
+
+      # Start Appium
+      - name: Start Appium Server
         run: |
-          nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
-          sleep 5
+
+          echo "Starting Appium..."
+
+          nohup appium \
+            --address 127.0.0.1 \
+            --port 4723 \
+            > appium.log 2>&1 &
+
+          echo "Waiting for Appium..."
+
+          for i in {1..30}; do
+
+            if curl -s http://127.0.0.1:4723/status > /dev/null; then
+              echo "Appium is ready!"
+              break
+            fi
+
+            sleep 2
+
+          done
+
+          echo "Appium status:"
           curl http://127.0.0.1:4723/status
 
+
+      # Run tests
       - name: Run Maven tests
-        run: mvn test
+        env:
+          ANDROID_DEVICE_NAME: test-emulator
+        run: |
+          mvn clean test
+
+      # Upload logs
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-automation-results
+          path: |
+            emulator.log
+            appium.log
+            target/surefire-reports/
