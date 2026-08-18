@@ -37,32 +37,56 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android emulator
+      - name: Create Android emulator
         run: |
-          sdkmanager "platform-tools" \
-                     "platforms;android-35" \
-                     "system-images;android-35;google_apis;x86_64"
+          sdkmanager "platform-tools" "emulator" \
+            "platforms;android-35" \
+            "system-images;android-35;google_apis;x86_64"
+          
           echo "no" | avdmanager create avd \
             -n test-emulator \
             -k "system-images;android-35;google_apis;x86_64" \
             --force
+          
+          emulator -list-avds
 
       - name: Start Android emulator
+        timeout-minutes: 5
         run: |
-          nohup $ANDROID_HOME/emulator/emulator \
-            -avd test-emulator \
-            -no-window \
-            -no-audio \
-            -no-boot-anim \
-            -gpu swiftshader_indirect > emulator.log 2>&1 &
-
+          echo "Starting emulator..."
+          
+          nohup emulator \
+          -avd test-emulator \
+          -no-window \
+          -no-audio \
+          -no-boot-anim \
+          -no-snapshot \
+          -gpu swiftshader_indirect \
+          > emulator.log 2>&1 &
+          
+          echo "Waiting for device..."
+          
           adb wait-for-device
+          
+          echo "ADB detected device"
+          
+          for i in {1..60}; do
+          BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
-          while [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" != "1" ]; do
-            sleep 5
+          echo "Boot status: $BOOT_COMPLETED"
+
+          if [ "$BOOT_COMPLETED" = "1" ]; then
+           echo "Android emulator is ready!"
+           break
+          fi
+
+          sleep 5
           done
-
+          
           adb devices
+          
+          echo "===== Emulator Log ====="
+          cat emulator.log
 
       - name: Start Appium server
         run: |
