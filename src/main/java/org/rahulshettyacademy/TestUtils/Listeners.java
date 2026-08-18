@@ -11,14 +11,11 @@ import utils.AppiumUtils;
 
 import java.io.IOException;
 
-public class Listeners extends AppiumUtils implements ITestListener {
+public class Listeners implements ITestListener{
    ExtentReports extentReports =ExtentReporterNG.getReporterObject();
     ExtentTest test;
     //AppiumDriver driver;
-   public Listeners(AppiumDriver driver){
-        super(driver);
-       // this.driver =driver;
-    }
+
     @Override
     public void onTestStart(ITestResult result) {
         System.out.println("Test Started: " + result.getName());
@@ -44,7 +41,9 @@ public class Listeners extends AppiumUtils implements ITestListener {
                         .getField("driver")
                         .get(result.getInstance());
 
-                String screenshotPath = getScreenshotPath(
+                AppiumUtils appiumUtils = new AppiumUtils(driver);
+
+                String screenshotPath = appiumUtils.getScreenshotPath(
                         result.getMethod().getMethodName(),
                         driver
                 );
@@ -58,7 +57,7 @@ public class Listeners extends AppiumUtils implements ITestListener {
 
     @Override
     public void onTestSkipped(ITestResult result) {
-        System.out.println("Test Skipped: " + result.getName());
+        System.out.println("Test Skipped:" + result.getName());
     }
 
     @Override
