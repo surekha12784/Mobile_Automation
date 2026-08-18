@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -28,17 +29,40 @@ jobs:
       - name: Install Appium
         run: |
           npm install -g appium
-          appium -v
+          appium --version
 
-      - name: Install UiAutomator2 driver
+      - name: Install UiAutomator2
         run: |
           appium driver install uiautomator2
           appium driver list --installed
 
-      - name: Check Appium
+      - name: Enable KVM
         run: |
-          which appium
-          appium driver list --installed
+          sudo apt-get update
+          sudo apt-get install -y qemu-kvm
+          sudo adduser $USER kvm
+          sudo chown $USER /dev/kvm
+
+      - name: Start Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -no-audio -no-boot-anim
+          disable-animations: true
+          script: adb devices
+
+      - name: Start Appium
+        run: |
+          nohup appium --address 127.0.0.1 --port 4723 > appium.log 2>&1 &
+          sleep 5
+          curl http://127.0.0.1:4723/status
+
+      - name: Check Android device
+        run: |
+          adb devices
 
       - name: Run Maven tests
         run: mvn clean test
