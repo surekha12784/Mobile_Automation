@@ -8,9 +8,7 @@ import org.rahulshettyacademy.pageObjects.android.FormPage;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.net.MalformedURLException;
     import java.net.URL;
     import java.time.Duration;
@@ -26,11 +24,17 @@ import java.net.MalformedURLException;
 
             Properties prop = new Properties();
 
-            FileInputStream fis = new FileInputStream(
-                    System.getProperty("user.dir") + "\\src\\main\\resources\\data.properties"
-            );
+            InputStream input = getClass()
+                    .getClassLoader()
+                    .getResourceAsStream("data.properties");
 
-            prop.load(fis);
+            if (input == null) {
+                throw new FileNotFoundException("data.properties not found in classpath");
+            }
+
+            prop.load(input);
+
+
             String ipAddress =prop.getProperty("ipAddress");
             String port =prop.getProperty("port");
             //service =startAppiumServer(ipAddress,Integer.parseInt(port));
