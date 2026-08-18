@@ -27,7 +27,7 @@ import java.net.MalformedURLException;
             Properties prop = new Properties();
 
             FileInputStream fis = new FileInputStream(
-                    "C:\\Users\\msurekha\\IdeaProjects\\MobilePOMFramework1\\src\\main\\resources\\data.properties"
+                    System.getProperty("user.dir") + "\\src\\main\\resources\\data.properties"
             );
 
             prop.load(fis);
