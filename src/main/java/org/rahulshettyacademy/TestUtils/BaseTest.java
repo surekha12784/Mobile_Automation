@@ -40,12 +40,10 @@ import java.net.MalformedURLException;
             //service =startAppiumServer(ipAddress,Integer.parseInt(port));
 
         //code to start server
-
-        sservice = new AppiumServiceBuilder()
-                .withIPAddress(ipAddress)
-                .usingPort(Integer.parseInt(port))
-                .build();
-        );
+            service = new AppiumServiceBuilder()
+                    .withIPAddress(ipAddress)
+                    .usingPort(Integer.parseInt(port))
+                    .build();
         service.start();
 
 
