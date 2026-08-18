@@ -5,5 +5,5 @@
         <listener class-name="org.rahulshettyacademy.TestUtils.Listeners"></listener>
     </listeners>
     <test verbose="2" preserve-order="true" name="C:/Users/msurekha/IdeaProjects/MobilePOMFramework1">
-        <classes><class name="org.rahulshettyacademy.pageObjects.android.eCommerce_tc_3">
+        <classes><class name="eCommerce_tc_3">
             <methods><include name="FillForm"/></methods></class></classes></test></suite>
