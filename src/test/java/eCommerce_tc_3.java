@@ -1,7 +1,6 @@
-package org.rahulshettyacademy.pageObjects.android;
-
-import com.aventstack.extentreports.ExtentTest;
 import org.rahulshettyacademy.TestUtils.BaseTest;
+import org.rahulshettyacademy.pageObjects.android.CartPage;
+import org.rahulshettyacademy.pageObjects.android.ProductCatalog;
 import org.testng.Assert;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.DataProvider;
