@@ -54,7 +54,16 @@ jobs:
           sdkmanager "system-images;android-35;google_apis;x86_64"
 
       # -------------------------------------------------
-      # Install Appium 3
+      # Enable KVM
+      # -------------------------------------------------
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # -------------------------------------------------
+      # Install Appium
       # -------------------------------------------------
       - name: Install Appium
         run: |
@@ -80,13 +89,14 @@ jobs:
             --device "pixel_2" \
             --force
 
+          echo "Available AVDs:"
           emulator -list-avds
 
       # -------------------------------------------------
       # Start emulator
       # -------------------------------------------------
       - name: Start Android Emulator
-        timeout-minutes: 8
+        timeout-minutes: 10
         run: |
           echo "Starting Android emulator..."
 
@@ -106,7 +116,7 @@ jobs:
 
           echo "ADB device detected"
 
-          for i in {1..90}; do
+          for i in {1..120}; do
             BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
             echo "Boot status: $BOOT_COMPLETED"
@@ -116,26 +126,37 @@ jobs:
               break
             fi
 
-            sleep 3
+            sleep 2
           done
 
-          echo "Devices:"
+          echo "===== DEVICES ====="
           adb devices
 
-          echo "Boot completed:"
-          adb shell getprop sys.boot_completed
+          echo "===== DEVICE STATE ====="
+          adb get-state
 
-          echo "Emulator log:"
-          cat emulator.log
+          echo "===== BOOT COMPLETED ====="
+          adb shell getprop sys.boot_completed
 
       # -------------------------------------------------
       # Verify emulator
       # -------------------------------------------------
       - name: Verify Android Emulator
         run: |
+          echo "===== ADB DEVICES ====="
           adb devices
+
+          echo "===== ADB STATE ====="
+          adb get-state
+
+          echo "===== MODEL ====="
           adb shell getprop ro.product.model
+
+          echo "===== SDK ====="
           adb shell getprop ro.build.version.sdk
+
+          echo "===== BOOT STATUS ====="
+          adb shell getprop sys.boot_completed
 
       # -------------------------------------------------
       # Start Appium
@@ -152,7 +173,6 @@ jobs:
           echo "Waiting for Appium..."
 
           for i in {1..30}; do
-
             if curl -sf http://127.0.0.1:4723/status > /dev/null; then
               echo "Appium is READY"
               break
@@ -160,16 +180,37 @@ jobs:
 
             echo "Waiting for Appium..."
             sleep 2
-
           done
 
-          echo "Appium status:"
+          echo "===== APPIUM STATUS ====="
           curl -v http://127.0.0.1:4723/status
-      - name: Check Android device
+
+      # -------------------------------------------------
+      # Final Android and Appium check
+      # -------------------------------------------------
+      - name: Final Android and Appium check
         run: |
+          echo "===== ADB DEVICES ====="
           adb devices
-          adb shell getprop ro.product.model
-          adb shell getprop ro.build.version.sdk
+
+          echo "===== ADB STATE ====="
+          adb get-state
+
+          echo "===== BOOT STATUS ====="
+          adb shell getprop sys.boot_completed
+
+          echo "===== APPIUM STATUS ====="
+          curl -v http://127.0.0.1:4723/status
+
+          echo "===== APK ====="
+          ls -lh src/main/resources/General-Store.apk
+
+          echo "===== APK FILE SEARCH ====="
+          find . -name "*.apk" -type f -print
+
+          echo "===== APPIUM LOG ====="
+          cat appium.log
+
       # -------------------------------------------------
       # Run Maven tests
       # -------------------------------------------------

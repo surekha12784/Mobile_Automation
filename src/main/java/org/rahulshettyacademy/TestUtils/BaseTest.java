@@ -69,6 +69,11 @@ public class BaseTest {
                 new URL("http://" + ipAddress + ":" + port);
 
         System.out.println("Appium Server  : " + appiumServerUrl);
+        System.out.println("Appium Server: " + appiumServerUrl);
+        System.out.println("APK exists: " +
+                new java.io.File(appPath).exists());
+
+        System.out.println("Creating AndroidDriver...");
 
         driver = new AndroidDriver(
                 appiumServerUrl,
