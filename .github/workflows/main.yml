@@ -170,33 +170,70 @@ jobs:
         run: |
           echo "Starting Android emulator..."
 
+          adb start-server
+
           nohup emulator \
             -avd test-emulator \
             -no-window \
             -no-audio \
             -no-boot-anim \
             -no-snapshot \
-            -gpu swiftshader_indirect \
             -no-metrics \
+            -gpu swiftshader_indirect \
+            -accel on \
             > emulator.log 2>&1 &
 
           EMULATOR_PID=$!
 
           echo "Emulator PID: $EMULATOR_PID"
 
-          echo "Waiting for emulator..."
+          echo "Waiting for emulator process..."
 
-          adb wait-for-device
+          sleep 10
 
-          echo "ADB device detected."
+          echo "===== EMULATOR PROCESS ====="
+          ps -ef | grep '[e]mulator' || true
+
+          echo "===== EMULATOR LOG ====="
+          cat emulator.log || true
+
+          echo "Waiting for ADB device..."
+
+          for i in {1..60}; do
+
+            echo "ADB attempt $i"
+
+            adb devices -l
+
+            if adb devices | grep -q "emulator-5554"; then
+              echo "Emulator detected by ADB."
+              break
+            fi
+
+            sleep 5
+          done
+
+          if ! adb devices | grep -q "emulator-5554"; then
+            echo "ERROR: Emulator never appeared in ADB."
+
+            echo "===== ADB ====="
+            adb devices -l
+
+            echo "===== EMULATOR LOG ====="
+            cat emulator.log
+
+            exit 1
+          fi
+
+          echo "Waiting for Android boot..."
 
           BOOT_COMPLETED=""
 
           for i in {1..120}; do
 
-            BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
+            BOOT_COMPLETED=$(adb -s emulator-5554 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
-            echo "Attempt $i - Boot status: $BOOT_COMPLETED"
+            echo "Boot attempt $i: $BOOT_COMPLETED"
 
             if [ "$BOOT_COMPLETED" = "1" ]; then
               echo "Android emulator boot completed."
@@ -207,13 +244,10 @@ jobs:
           done
 
           if [ "$BOOT_COMPLETED" != "1" ]; then
-            echo "Android emulator failed to boot."
+            echo "ERROR: Android emulator did not finish booting."
 
             echo "===== ADB DEVICES ====="
             adb devices -l
-
-            echo "===== EMULATOR PROCESS ====="
-            ps -ef | grep '[e]mulator' || true
 
             echo "===== EMULATOR LOG ====="
             cat emulator.log
