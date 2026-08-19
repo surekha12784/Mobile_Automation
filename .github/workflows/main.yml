@@ -20,7 +20,7 @@ jobs:
         uses: actions/checkout@v4
 
       # -------------------------------------------------
-      # Java
+      # Java 17
       # -------------------------------------------------
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -30,7 +30,7 @@ jobs:
           cache: maven
 
       # -------------------------------------------------
-      # Node
+      # Node.js
       # -------------------------------------------------
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -44,9 +44,9 @@ jobs:
         uses: android-actions/setup-android@v3
 
       # -------------------------------------------------
-      # Android packages
+      # Install Android SDK packages
       # -------------------------------------------------
-      - name: Install Android SDK
+      - name: Install Android SDK packages
         run: |
           sdkmanager "platform-tools"
           sdkmanager "emulator"
@@ -54,20 +54,27 @@ jobs:
           sdkmanager "system-images;android-35;google_apis;x86_64"
 
       # -------------------------------------------------
-      # Enable KVM
+      # Enable KVM for Android Emulator
       # -------------------------------------------------
       - name: Enable KVM
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+
+          echo "KVM devices:"
+          ls -la /dev/kvm || true
 
       # -------------------------------------------------
       # Install Appium
       # -------------------------------------------------
       - name: Install Appium
         run: |
-          npm install -g appium@latest
+          npm install -g appium@3
+
+          echo "Appium version:"
           appium --version
 
       # -------------------------------------------------
@@ -76,10 +83,12 @@ jobs:
       - name: Install UiAutomator2
         run: |
           appium driver install uiautomator2
+
+          echo "Installed Appium drivers:"
           appium driver list --installed
 
       # -------------------------------------------------
-      # Create emulator
+      # Create Android Emulator
       # -------------------------------------------------
       - name: Create Android Emulator
         run: |
@@ -93,7 +102,7 @@ jobs:
           emulator -list-avds
 
       # -------------------------------------------------
-      # Start emulator
+      # Start Android Emulator
       # -------------------------------------------------
       - name: Start Android Emulator
         timeout-minutes: 10
@@ -110,36 +119,54 @@ jobs:
             -no-metrics \
             > emulator.log 2>&1 &
 
-          echo "Waiting for ADB..."
+          echo "Waiting for ADB device..."
 
           adb wait-for-device
 
-          echo "ADB device detected"
+          echo "ADB device detected."
+
+          echo "Waiting for Android boot to complete..."
+
+          BOOT_COMPLETED=""
 
           for i in {1..120}; do
+
             BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
-            echo "Boot status: $BOOT_COMPLETED"
+            echo "Attempt $i - Boot status: $BOOT_COMPLETED"
 
             if [ "$BOOT_COMPLETED" = "1" ]; then
-              echo "Android emulator boot completed"
+              echo "Android emulator boot completed."
               break
             fi
 
             sleep 2
+
           done
 
-          echo "===== DEVICES ====="
+          if [ "$BOOT_COMPLETED" != "1" ]; then
+            echo "Android emulator failed to boot."
+
+            echo "===== ADB DEVICES ====="
+            adb devices
+
+            echo "===== EMULATOR LOG ====="
+            cat emulator.log
+
+            exit 1
+          fi
+
+          echo "===== ADB DEVICES ====="
           adb devices
 
-          echo "===== DEVICE STATE ====="
+          echo "===== ADB STATE ====="
           adb get-state
 
-          echo "===== BOOT COMPLETED ====="
+          echo "===== BOOT STATUS ====="
           adb shell getprop sys.boot_completed
 
       # -------------------------------------------------
-      # Verify emulator
+      # Verify Android Emulator
       # -------------------------------------------------
       - name: Verify Android Emulator
         run: |
@@ -149,47 +176,93 @@ jobs:
           echo "===== ADB STATE ====="
           adb get-state
 
-          echo "===== MODEL ====="
+          echo "===== DEVICE MODEL ====="
           adb shell getprop ro.product.model
 
-          echo "===== SDK ====="
+          echo "===== ANDROID VERSION ====="
+          adb shell getprop ro.build.version.release
+
+          echo "===== SDK VERSION ====="
           adb shell getprop ro.build.version.sdk
 
           echo "===== BOOT STATUS ====="
           adb shell getprop sys.boot_completed
 
+          echo "===== ADB VERSION ====="
+          adb version
+
       # -------------------------------------------------
-      # Start Appium
+      # Verify APK
+      # -------------------------------------------------
+      - name: Verify APK
+        run: |
+          echo "===== CURRENT DIRECTORY ====="
+          pwd
+
+          echo "===== APK FILES ====="
+          find . -name "*.apk" -type f -print
+
+          echo "===== EXPECTED APK ====="
+          ls -lh src/main/resources/General-Store.apk
+
+          echo "===== APK INFORMATION ====="
+          aapt dump badging src/main/resources/General-Store.apk | head -20
+
+      # -------------------------------------------------
+      # Start Appium Server
       # -------------------------------------------------
       - name: Start Appium Server
         run: |
           echo "Starting Appium server..."
 
-          nohup appium \
+          appium \
             --address 127.0.0.1 \
             --port 4723 \
+            --log-level debug \
             > appium.log 2>&1 &
 
-          echo "Waiting for Appium..."
+          APPIUM_PID=$!
+
+          echo "Appium PID: $APPIUM_PID"
+
+          echo "Waiting for Appium server..."
+
+          APPIUM_READY=false
 
           for i in {1..30}; do
+
             if curl -sf http://127.0.0.1:4723/status > /dev/null; then
-              echo "Appium is READY"
+              echo "Appium is READY."
+              APPIUM_READY=true
               break
             fi
 
-            echo "Waiting for Appium..."
+            echo "Waiting for Appium... attempt $i"
             sleep 2
+
           done
+
+          if [ "$APPIUM_READY" != "true" ]; then
+            echo "Appium failed to start."
+
+            echo "===== APPIUM LOG ====="
+            cat appium.log
+
+            exit 1
+          fi
 
           echo "===== APPIUM STATUS ====="
           curl -v http://127.0.0.1:4723/status
 
       # -------------------------------------------------
-      # Final Android and Appium check
+      # Final Environment Check
       # -------------------------------------------------
       - name: Final Android and Appium check
         run: |
+          echo "========================================"
+          echo "FINAL ENVIRONMENT CHECK"
+          echo "========================================"
+
           echo "===== ADB DEVICES ====="
           adb devices
 
@@ -202,29 +275,81 @@ jobs:
           echo "===== APPIUM STATUS ====="
           curl -v http://127.0.0.1:4723/status
 
+          echo "===== APPIUM VERSION ====="
+          appium --version
+
+          echo "===== APPIUM DRIVERS ====="
+          appium driver list --installed
+
           echo "===== APK ====="
           ls -lh src/main/resources/General-Store.apk
 
-          echo "===== APK FILE SEARCH ====="
-          find . -name "*.apk" -type f -print
-
-          echo "===== APPIUM LOG ====="
-          cat appium.log
-
       # -------------------------------------------------
-      # Run Maven tests
+      # Run Maven Tests
       # -------------------------------------------------
       - name: Run Maven tests
         env:
           ANDROID_DEVICE_NAME: test-emulator
           APPIUM_SERVER_URL: http://127.0.0.1:4723
         run: |
-          mvn clean test
+          mvn clean test -e
 
       # -------------------------------------------------
-      # Upload logs
+      # Display Appium Log
+      # Always execute even if Maven fails
       # -------------------------------------------------
-      - name: Upload logs
+      - name: Show Appium Log
+        if: always()
+        run: |
+          echo "========================================"
+          echo "APPIUM LOG"
+          echo "========================================"
+
+          if [ -f appium.log ]; then
+            cat appium.log
+          else
+            echo "appium.log was not found."
+          fi
+
+      # -------------------------------------------------
+      # Display Emulator Log
+      # Always execute
+      # -------------------------------------------------
+      - name: Show Emulator Log
+        if: always()
+        run: |
+          echo "========================================"
+          echo "EMULATOR LOG"
+          echo "========================================"
+
+          if [ -f emulator.log ]; then
+            cat emulator.log
+          else
+            echo "emulator.log was not found."
+          fi
+
+      # -------------------------------------------------
+      # Display Test Reports
+      # Always execute
+      # -------------------------------------------------
+      - name: Show Surefire Reports
+        if: always()
+        run: |
+          echo "========================================"
+          echo "SUREFIRE REPORTS"
+          echo "========================================"
+
+          if [ -d target/surefire-reports ]; then
+            find target/surefire-reports -type f -maxdepth 2 -print
+          else
+            echo "Surefire reports directory not found."
+          fi
+
+      # -------------------------------------------------
+      # Upload Logs and Test Results
+      # Always execute
+      # -------------------------------------------------
+      - name: Upload logs and test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -233,3 +358,4 @@ jobs:
             emulator.log
             appium.log
             target/surefire-reports/
+          if-no-files-found: warn
