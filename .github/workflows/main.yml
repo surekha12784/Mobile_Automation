@@ -283,7 +283,27 @@ jobs:
 
           echo "===== APK ====="
           ls -lh src/main/resources/General-Store.apk
+      - name: Verify Appium before Maven
+        run: |
+          echo "========================================"
+          echo "CHECKING APPIUM"
+          echo "========================================"
 
+          echo "===== Appium process ====="
+          ps aux | grep appium | grep -v grep || true
+
+          echo "===== Port 4723 ====="
+          ss -lntp | grep 4723 || true
+
+          echo "===== Appium status ====="
+          curl -v http://127.0.0.1:4723/status
+
+          echo "===== Appium log ====="
+          if [ -f appium.log ]; then
+            cat appium.log
+          else
+            echo "appium.log does NOT exist"
+          fi
       # -------------------------------------------------
       # Run Maven Tests
       # -------------------------------------------------

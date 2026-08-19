@@ -72,13 +72,24 @@ public class BaseTest {
         System.out.println("Appium Server: " + appiumServerUrl);
         System.out.println("APK exists: " +
                 new java.io.File(appPath).exists());
+        System.out.println("Appium Server : " + appiumServerUrl);
+        System.out.println("Capabilities  : " + options);
+        try {
+            System.out.println("Creating AndroidDriver...");
 
-        System.out.println("Creating AndroidDriver...");
+            driver = new AndroidDriver(
+                    appiumServerUrl,
+                    options
+            );
 
-        driver = new AndroidDriver(
-                appiumServerUrl,
-                options
-        );
+            System.out.println("AndroidDriver created successfully");
+
+        } catch (Exception e) {
+            System.out.println("========== APPIUM SESSION CREATION FAILED ==========");
+            e.printStackTrace();
+            System.out.println("=====================================================");
+            throw e;
+        }
 
         driver.manage()
                 .timeouts()
