@@ -97,7 +97,7 @@ jobs:
           echo "===== Android versions ====="
           adb version
           emulator -version
-          avdmanager --version
+          
 
       # -------------------------------------------------
       # Verify Emulator Dependencies
