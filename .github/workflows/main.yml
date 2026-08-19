@@ -11,17 +11,25 @@ jobs:
   test:
     runs-on: ubuntu-24.04
 
+    # -------------------------------------------------
+    # Android environment
+    # -------------------------------------------------
+    env:
+      ANDROID_AVD_HOME: /home/runner/.android/avd
+      ANDROID_SDK_HOME: /home/runner/.android
+
     steps:
 
-      # -------------------------------------------------
+      # =================================================
       # Checkout
-      # -------------------------------------------------
+      # =================================================
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # -------------------------------------------------
+
+      # =================================================
       # Java 17
-      # -------------------------------------------------
+      # =================================================
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -29,32 +37,46 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      # -------------------------------------------------
+
+      # =================================================
       # Node.js 20
-      # -------------------------------------------------
+      # =================================================
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # -------------------------------------------------
+
+      # =================================================
       # Android SDK
-      # -------------------------------------------------
+      # =================================================
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      # -------------------------------------------------
+
+      # =================================================
       # Android PATH
-      # -------------------------------------------------
-      - name: Configure Android SDK PATH
+      # =================================================
+      - name: Configure Android SDK
         run: |
           echo "$ANDROID_HOME/emulator" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
 
-      # -------------------------------------------------
-      # Install Linux dependencies for Android Emulator
-      # -------------------------------------------------
+          mkdir -p "$ANDROID_AVD_HOME"
+
+          echo "========================================"
+          echo "ANDROID ENVIRONMENT"
+          echo "========================================"
+
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
+          echo "ANDROID_SDK_HOME=$ANDROID_SDK_HOME"
+
+
+      # =================================================
+      # Install Linux Emulator Dependencies
+      # =================================================
       - name: Install Emulator Dependencies
         run: |
           sudo apt-get update
@@ -79,12 +101,16 @@ jobs:
             libglu1-mesa \
             libfontconfig1
 
-          echo "===== PulseAudio ====="
+          echo "========================================"
+          echo "PULSEAUDIO"
+          echo "========================================"
+
           ldconfig -p | grep libpulse || true
 
-      # -------------------------------------------------
-      # Install Android SDK
-      # -------------------------------------------------
+
+      # =================================================
+      # Install Android SDK Packages
+      # =================================================
       - name: Install Android SDK packages
         run: |
           yes | sdkmanager --licenses || true
@@ -94,29 +120,41 @@ jobs:
           sdkmanager "platforms;android-35"
           sdkmanager "system-images;android-35;google_apis;x86_64"
 
-          echo "===== Android versions ====="
-          adb version
-          emulator -version
-          
+          echo "========================================"
+          echo "ANDROID VERSIONS"
+          echo "========================================"
 
-      # -------------------------------------------------
+          echo "===== ADB ====="
+          adb version
+
+          echo "===== EMULATOR ====="
+          emulator -version
+
+
+      # =================================================
       # Verify Emulator Dependencies
-      # -------------------------------------------------
+      # =================================================
       - name: Verify Emulator Dependencies
         run: |
-          echo "===== Emulator ====="
+          echo "========================================"
+          echo "EMULATOR VERIFICATION"
+          echo "========================================"
+
+          echo "===== WHICH EMULATOR ====="
           which emulator
 
-          echo "===== Emulator Version ====="
+          echo "===== EMULATOR VERSION ====="
           emulator -version
 
-          echo "===== QEMU Dependencies ====="
+          echo "===== QEMU DEPENDENCIES ====="
+
           ldd "$ANDROID_HOME/emulator/qemu/linux-x86_64/qemu-system-x86_64" \
             | grep "not found" || true
 
-      # -------------------------------------------------
+
+      # =================================================
       # Enable KVM
-      # -------------------------------------------------
+      # =================================================
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
@@ -125,52 +163,122 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-          echo "===== KVM ====="
-          ls -la /dev/kvm || true
+          echo "========================================"
+          echo "KVM"
+          echo "========================================"
 
-      # -------------------------------------------------
-      # Install Appium 2
-      # -------------------------------------------------
+          if [ -e /dev/kvm ]; then
+            sudo chmod 666 /dev/kvm
+            ls -la /dev/kvm
+            echo "KVM is available."
+          else
+            echo "WARNING: /dev/kvm is not available."
+            echo "Emulator will attempt to run without KVM."
+          fi
+
+
+      # =================================================
+      # Install Appium 3
+      # =================================================
       - name: Install Appium
         run: |
           npm install -g appium@3
 
-          echo "===== APPIUM VERSION ====="
+          echo "========================================"
+          echo "APPIUM VERSION"
+          echo "========================================"
+
           appium --version
 
-      # -------------------------------------------------
+
+      # =================================================
       # Install UiAutomator2
-      # -------------------------------------------------
+      # =================================================
       - name: Install UiAutomator2
         run: |
           appium driver install uiautomator2
 
-          echo "===== APPIUM DRIVERS ====="
+          echo "========================================"
+          echo "APPIUM DRIVERS"
+          echo "========================================"
+
           appium driver list --installed
 
-      # -------------------------------------------------
+
+      # =================================================
       # Create Android Emulator
-      # -------------------------------------------------
+      # =================================================
       - name: Create Android Emulator
         run: |
+          mkdir -p "$ANDROID_AVD_HOME"
+
+          echo "========================================"
+          echo "CREATING ANDROID AVD"
+          echo "========================================"
+
+          echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME"
+
           echo "no" | avdmanager create avd \
             --name test-emulator \
             --package "system-images;android-35;google_apis;x86_64" \
             --device "pixel_2" \
             --force
 
-          echo "===== AVAILABLE AVDs ====="
+          echo "========================================"
+          echo "AVD DIRECTORY"
+          echo "========================================"
+
+          ls -la "$ANDROID_AVD_HOME"
+
+          echo "========================================"
+          echo "AVAILABLE AVDs"
+          echo "========================================"
+
           emulator -list-avds
 
-      # -------------------------------------------------
+          echo "========================================"
+          echo "AVD DETAILS"
+          echo "========================================"
+
+          avdmanager list avd
+
+          echo "========================================"
+          echo "VERIFY TEST-EMULATOR"
+          echo "========================================"
+
+          if emulator -list-avds | grep -qx "test-emulator"; then
+            echo "test-emulator AVD exists."
+          else
+            echo "ERROR: test-emulator AVD was not created."
+            exit 1
+          fi
+
+
+      # =================================================
       # Start Android Emulator
-      # -------------------------------------------------
+      # =================================================
       - name: Start Android Emulator
         timeout-minutes: 10
         run: |
-          echo "Starting Android emulator..."
+          echo "========================================"
+          echo "STARTING ANDROID EMULATOR"
+          echo "========================================"
+
+          echo "===== AVAILABLE AVDs ====="
+          emulator -list-avds
+
+          if ! emulator -list-avds | grep -qx "test-emulator"; then
+            echo "ERROR: test-emulator AVD does not exist."
+
+            echo "===== AVD DIRECTORY ====="
+            ls -la "$ANDROID_AVD_HOME"
+
+            exit 1
+          fi
 
           adb start-server
+
+          echo "Starting emulator..."
 
           nohup emulator \
             -avd test-emulator \
@@ -180,7 +288,6 @@ jobs:
             -no-snapshot \
             -no-metrics \
             -gpu swiftshader_indirect \
-            -accel on \
             > emulator.log 2>&1 &
 
           EMULATOR_PID=$!
@@ -192,12 +299,18 @@ jobs:
           sleep 10
 
           echo "===== EMULATOR PROCESS ====="
+
           ps -ef | grep '[e]mulator' || true
 
-          echo "===== EMULATOR LOG ====="
+          echo "===== INITIAL EMULATOR LOG ====="
+
           cat emulator.log || true
 
-          echo "Waiting for ADB device..."
+          echo "========================================"
+          echo "WAITING FOR ADB DEVICE"
+          echo "========================================"
+
+          EMULATOR_FOUND=false
 
           for i in {1..60}; do
 
@@ -207,17 +320,22 @@ jobs:
 
             if adb devices | grep -q "emulator-5554"; then
               echo "Emulator detected by ADB."
+              EMULATOR_FOUND=true
               break
             fi
 
             sleep 5
           done
 
-          if ! adb devices | grep -q "emulator-5554"; then
+          if [ "$EMULATOR_FOUND" != "true" ]; then
+
             echo "ERROR: Emulator never appeared in ADB."
 
-            echo "===== ADB ====="
+            echo "===== ADB DEVICES ====="
             adb devices -l
+
+            echo "===== EMULATOR PROCESS ====="
+            ps -ef | grep '[e]mulator' || true
 
             echo "===== EMULATOR LOG ====="
             cat emulator.log
@@ -225,7 +343,9 @@ jobs:
             exit 1
           fi
 
-          echo "Waiting for Android boot..."
+          echo "========================================"
+          echo "WAITING FOR ANDROID BOOT"
+          echo "========================================"
 
           BOOT_COMPLETED=""
 
@@ -244,10 +364,14 @@ jobs:
           done
 
           if [ "$BOOT_COMPLETED" != "1" ]; then
+
             echo "ERROR: Android emulator did not finish booting."
 
             echo "===== ADB DEVICES ====="
             adb devices -l
+
+            echo "===== BOOT STATUS ====="
+            adb -s emulator-5554 shell getprop sys.boot_completed || true
 
             echo "===== EMULATOR LOG ====="
             cat emulator.log
@@ -255,11 +379,20 @@ jobs:
             exit 1
           fi
 
-      # -------------------------------------------------
+          echo "========================================"
+          echo "ANDROID EMULATOR READY"
+          echo "========================================"
+
+
+      # =================================================
       # Verify Android Emulator
-      # -------------------------------------------------
+      # =================================================
       - name: Verify Android Emulator
         run: |
+          echo "========================================"
+          echo "ANDROID EMULATOR VERIFICATION"
+          echo "========================================"
+
           echo "===== ADB DEVICES ====="
           adb devices -l
 
@@ -267,40 +400,48 @@ jobs:
           adb get-state
 
           echo "===== MODEL ====="
-          adb shell getprop ro.product.model
+          adb -s emulator-5554 shell getprop ro.product.model
 
           echo "===== ANDROID VERSION ====="
-          adb shell getprop ro.build.version.release
+          adb -s emulator-5554 shell getprop ro.build.version.release
 
           echo "===== SDK VERSION ====="
-          adb shell getprop ro.build.version.sdk
+          adb -s emulator-5554 shell getprop ro.build.version.sdk
 
           echo "===== BOOT STATUS ====="
-          adb shell getprop sys.boot_completed
+          adb -s emulator-5554 shell getprop sys.boot_completed
 
-      # -------------------------------------------------
+
+      # =================================================
       # Verify APK
-      # -------------------------------------------------
+      # =================================================
       - name: Verify APK
         run: |
           APK="$GITHUB_WORKSPACE/src/main/resources/General-Store.apk"
 
-          echo "===== APK ====="
-          ls -lh "$APK"
+          echo "========================================"
+          echo "APK VERIFICATION"
+          echo "========================================"
 
           if [ ! -f "$APK" ]; then
-            echo "ERROR: APK not found"
+            echo "ERROR: APK not found:"
+            echo "$APK"
             exit 1
           fi
 
+          ls -lh "$APK"
+
           echo "APK exists."
 
-      # -------------------------------------------------
+
+      # =================================================
       # Start Appium Server
-      # -------------------------------------------------
+      # =================================================
       - name: Start Appium Server
         run: |
-          echo "Starting Appium server..."
+          echo "========================================"
+          echo "STARTING APPIUM SERVER"
+          echo "========================================"
 
           nohup appium \
             --address 127.0.0.1 \
@@ -328,6 +469,7 @@ jobs:
           done
 
           if [ "$APPIUM_READY" != "true" ]; then
+
             echo "ERROR: Appium failed to start."
 
             echo "===== APPIUM LOG ====="
@@ -336,12 +478,16 @@ jobs:
             exit 1
           fi
 
-          echo "===== APPIUM STATUS ====="
+          echo "========================================"
+          echo "APPIUM STATUS"
+          echo "========================================"
+
           curl -v http://127.0.0.1:4723/status
 
-      # -------------------------------------------------
-      # Verify Before Maven
-      # -------------------------------------------------
+
+      # =================================================
+      # Verify Complete Mobile Environment
+      # =================================================
       - name: Verify Mobile Automation Environment
         run: |
           echo "========================================"
@@ -354,24 +500,34 @@ jobs:
           echo "===== NODE ====="
           node --version
 
+          echo "===== NPM ====="
+          npm --version
+
           echo "===== APPIUM ====="
           appium --version
 
-          echo "===== ADB ====="
+          echo "===== APPIUM DRIVERS ====="
+          appium driver list --installed
+
+          echo "===== ADB DEVICES ====="
           adb devices -l
 
-          echo "===== BOOT ====="
-          adb shell getprop sys.boot_completed
+          echo "===== ADB STATE ====="
+          adb get-state
 
-          echo "===== APPIUM ====="
+          echo "===== BOOT STATUS ====="
+          adb -s emulator-5554 shell getprop sys.boot_completed
+
+          echo "===== APPIUM STATUS ====="
           curl -sf http://127.0.0.1:4723/status
 
           echo "===== APK ====="
           ls -lh "$GITHUB_WORKSPACE/src/main/resources/General-Store.apk"
 
-      # -------------------------------------------------
+
+      # =================================================
       # Run Maven Tests
-      # -------------------------------------------------
+      # =================================================
       - name: Run Maven tests
         env:
           ANDROID_DEVICE_NAME: test-emulator
@@ -381,9 +537,10 @@ jobs:
         run: |
           mvn clean test -e
 
-      # -------------------------------------------------
+
+      # =================================================
       # Show Appium Log
-      # -------------------------------------------------
+      # =================================================
       - name: Show Appium Log
         if: always()
         run: |
@@ -397,9 +554,10 @@ jobs:
             echo "appium.log was not found."
           fi
 
-      # -------------------------------------------------
+
+      # =================================================
       # Show Emulator Log
-      # -------------------------------------------------
+      # =================================================
       - name: Show Emulator Log
         if: always()
         run: |
@@ -413,9 +571,10 @@ jobs:
             echo "emulator.log was not found."
           fi
 
-      # -------------------------------------------------
+
+      # =================================================
       # Show Surefire Reports
-      # -------------------------------------------------
+      # =================================================
       - name: Show Surefire Reports
         if: always()
         run: |
@@ -429,9 +588,10 @@ jobs:
             echo "Surefire reports directory was not found."
           fi
 
-      # -------------------------------------------------
-      # Upload Results
-      # -------------------------------------------------
+
+      # =================================================
+      # Upload Logs and Test Results
+      # =================================================
       - name: Upload logs and test results
         if: always()
         uses: actions/upload-artifact@v4
