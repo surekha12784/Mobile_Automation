@@ -133,7 +133,7 @@ jobs:
       # -------------------------------------------------
       - name: Install Appium
         run: |
-          npm install -g appium@2.12.1
+          npm install -g appium@3
 
           echo "===== APPIUM VERSION ====="
           appium --version
