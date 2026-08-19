@@ -13,11 +13,15 @@ jobs:
 
     steps:
 
-      # Checkout code
+      # -------------------------------------------------
+      # Checkout
+      # -------------------------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # -------------------------------------------------
       # Java
+      # -------------------------------------------------
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -25,37 +29,49 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      # -------------------------------------------------
       # Node
+      # -------------------------------------------------
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
+      # -------------------------------------------------
       # Android SDK
+      # -------------------------------------------------
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
+      # -------------------------------------------------
       # Android packages
-      - name: Install Android SDK packages
+      # -------------------------------------------------
+      - name: Install Android SDK
         run: |
           sdkmanager "platform-tools"
           sdkmanager "emulator"
           sdkmanager "platforms;android-35"
           sdkmanager "system-images;android-35;google_apis;x86_64"
 
-      # Appium
+      # -------------------------------------------------
+      # Install Appium 3
+      # -------------------------------------------------
       - name: Install Appium
         run: |
           npm install -g appium@latest
           appium --version
 
-      # UiAutomator2
+      # -------------------------------------------------
+      # Install UiAutomator2
+      # -------------------------------------------------
       - name: Install UiAutomator2
         run: |
           appium driver install uiautomator2
           appium driver list --installed
 
+      # -------------------------------------------------
       # Create emulator
+      # -------------------------------------------------
       - name: Create Android Emulator
         run: |
           echo "no" | avdmanager create avd \
@@ -66,12 +82,13 @@ jobs:
 
           emulator -list-avds
 
+      # -------------------------------------------------
       # Start emulator
+      # -------------------------------------------------
       - name: Start Android Emulator
-        timeout-minutes: 10
+        timeout-minutes: 8
         run: |
-
-          echo "Starting emulator..."
+          echo "Starting Android emulator..."
 
           nohup emulator \
             -avd test-emulator \
@@ -83,39 +100,49 @@ jobs:
             -no-metrics \
             > emulator.log 2>&1 &
 
-          echo "Waiting for emulator..."
+          echo "Waiting for ADB..."
 
           adb wait-for-device
 
-          echo "ADB detected device"
+          echo "ADB device detected"
 
-          for i in {1..120}; do
-
+          for i in {1..90}; do
             BOOT_COMPLETED=$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')
 
             echo "Boot status: $BOOT_COMPLETED"
 
             if [ "$BOOT_COMPLETED" = "1" ]; then
-              echo "Android emulator is ready!"
+              echo "Android emulator boot completed"
               break
             fi
 
-            sleep 5
-
+            sleep 3
           done
 
-          echo "Connected devices:"
+          echo "Devices:"
           adb devices
 
           echo "Boot completed:"
           adb shell getprop sys.boot_completed
 
+          echo "Emulator log:"
+          cat emulator.log
 
+      # -------------------------------------------------
+      # Verify emulator
+      # -------------------------------------------------
+      - name: Verify Android Emulator
+        run: |
+          adb devices
+          adb shell getprop ro.product.model
+          adb shell getprop ro.build.version.sdk
+
+      # -------------------------------------------------
       # Start Appium
+      # -------------------------------------------------
       - name: Start Appium Server
         run: |
-
-          echo "Starting Appium..."
+          echo "Starting Appium server..."
 
           nohup appium \
             --address 127.0.0.1 \
@@ -126,27 +153,32 @@ jobs:
 
           for i in {1..30}; do
 
-            if curl -s http://127.0.0.1:4723/status > /dev/null; then
-              echo "Appium is ready!"
+            if curl -sf http://127.0.0.1:4723/status > /dev/null; then
+              echo "Appium is READY"
               break
             fi
 
+            echo "Waiting for Appium..."
             sleep 2
 
           done
 
           echo "Appium status:"
-          curl http://127.0.0.1:4723/status
+          curl -v http://127.0.0.1:4723/status
 
-
-      # Run tests
+      # -------------------------------------------------
+      # Run Maven tests
+      # -------------------------------------------------
       - name: Run Maven tests
         env:
           ANDROID_DEVICE_NAME: test-emulator
+          APPIUM_SERVER_URL: http://127.0.0.1:4723
         run: |
           mvn clean test
 
+      # -------------------------------------------------
       # Upload logs
+      # -------------------------------------------------
       - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v4
