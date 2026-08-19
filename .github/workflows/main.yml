@@ -165,7 +165,11 @@ jobs:
 
           echo "Appium status:"
           curl -v http://127.0.0.1:4723/status
-
+      - name: Check Android device
+        run: |
+          adb devices
+          adb shell getprop ro.product.model
+          adb shell getprop ro.build.version.sdk
       # -------------------------------------------------
       # Run Maven tests
       # -------------------------------------------------

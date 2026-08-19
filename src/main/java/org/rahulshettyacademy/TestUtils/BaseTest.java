@@ -34,27 +34,41 @@ public class BaseTest {
 
         prop.load(input);
 
-        String ipAddress = prop.getProperty("ipAddress");
-        String port = prop.getProperty("port");
+        String ipAddress = prop.getProperty("ipAddress", "127.0.0.1");
+        String port = prop.getProperty("port", "4723");
+
         String deviceName = System.getenv("ANDROID_DEVICE_NAME");
 
         if (deviceName == null || deviceName.isEmpty()) {
             deviceName = prop.getProperty("AndroidDeviceName");
         }
 
+        if (deviceName == null || deviceName.isEmpty()) {
+            throw new RuntimeException("Android device name is not configured");
+        }
 
+        String appPath = System.getProperty("user.dir")
+                + "/src/main/resources/General-Store.apk";
+
+        System.out.println("========== APPIUM CONFIG ==========");
+        System.out.println("Appium IP      : " + ipAddress);
+        System.out.println("Appium Port    : " + port);
+        System.out.println("Device Name    : " + deviceName);
+        System.out.println("App Path       : " + appPath);
+        System.out.println("====================================");
 
         UiAutomator2Options options = new UiAutomator2Options();
 
         options.setDeviceName(deviceName);
-
-        options.setApp(
-                System.getProperty("user.dir")
-                        + "/src/main/resources/General-Store.apk"
-        );
+        options.setUdid("emulator-5554");
+        options.setAutomationName("UiAutomator2");
+        options.setPlatformName("Android");
+        options.setApp(appPath);
 
         URL appiumServerUrl =
                 new URL("http://" + ipAddress + ":" + port);
+
+        System.out.println("Appium Server  : " + appiumServerUrl);
 
         driver = new AndroidDriver(
                 appiumServerUrl,
@@ -67,7 +81,6 @@ public class BaseTest {
 
         formPage = new FormPage(driver);
     }
-
     @AfterClass
     public void tearDown() {
 
