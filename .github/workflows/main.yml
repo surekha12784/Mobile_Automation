@@ -602,3 +602,13 @@ jobs:
             appium.log
             target/surefire-reports/
           if-no-files-found: warn
+      # -------------------------------------------------
+      # CD Phase 2 - Publish APK
+      # -------------------------------------------------
+      - name: Publish APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: src/main/resources/General-Store.apk
+          if-no-files-found: error
